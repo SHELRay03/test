@@ -5,13 +5,18 @@ import { todoOnDay } from '../utils/date'
 export function TodoSection({ day }: { day: Date }) {
   const todos = useAppStore((s) => s.todos)
   const showTodos = useAppStore((s) => s.filters.showTodos)
+  const searchQuery = useAppStore((s) => s.searchQuery)
   const toggleTodo = useAppStore((s) => s.toggleTodo)
   const openEditor = useAppStore((s) => s.openEditor)
 
   if (!showTodos) return null
 
+  const q = searchQuery.trim().toLowerCase()
   const list = todos
-    .filter((t) => todoOnDay(t.dueDate, day))
+    .filter(
+      (t) =>
+        todoOnDay(t.dueDate, day) && (!q || t.title.toLowerCase().includes(q)),
+    )
     .sort((a, b) => Number(a.completed) - Number(b.completed))
 
   return (

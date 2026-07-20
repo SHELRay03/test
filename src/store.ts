@@ -1,13 +1,15 @@
 import { create } from 'zustand'
-import { db } from './db'
+import { db, normalizeEvent } from './db'
 import type {
   CalendarEvent,
   DisplayFilters,
   EditorTarget,
   ItemColor,
+  RecurrenceRule,
   TodoItem,
   ViewMode,
 } from './types'
+import { DEFAULT_RECURRENCE } from './types'
 import { defaultEventRange, nowISO, toDateKey, uid } from './utils/date'
 
 interface AppState {
@@ -15,6 +17,7 @@ interface AppState {
   viewMode: ViewMode
   anchorDate: Date
   filters: DisplayFilters
+  searchQuery: string
   events: CalendarEvent[]
   todos: TodoItem[]
   editor: EditorTarget
@@ -22,6 +25,7 @@ interface AppState {
   setViewMode: (mode: ViewMode) => void
   setAnchorDate: (date: Date) => void
   setFilters: (partial: Partial<DisplayFilters>) => void
+  setSearchQuery: (q: string) => void
   openEditor: (target: NonNullable<EditorTarget>) => void
   closeEditor: () => void
   upsertEvent: (input: Partial<CalendarEvent> & { title: string }) => Promise<string>
@@ -30,14 +34,19 @@ interface AppState {
   deleteTodo: (id: string) => Promise<void>
   toggleTodo: (id: string) => Promise<void>
   toggleEventCompleted: (id: string) => Promise<void>
+  moveEventTimes: (
+    id: string,
+    start: Date,
+    end: Date,
+  ) => Promise<void>
 }
 
 async function loadAll() {
-  const [events, todos] = await Promise.all([
+  const [rawEvents, todos] = await Promise.all([
     db.events.toArray(),
     db.todos.toArray(),
   ])
-  return { events, todos }
+  return { events: rawEvents.map(normalizeEvent), todos }
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -45,6 +54,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   viewMode: 'day',
   anchorDate: startOfLocalDay(new Date()),
   filters: { showEvents: true, showTodos: true },
+  searchQuery: '',
   events: [],
   todos: [],
   editor: null,
@@ -64,6 +74,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAnchorDate: (date) => set({ anchorDate: startOfLocalDay(date) }),
   setFilters: (partial) =>
     set((s) => ({ filters: { ...s.filters, ...partial } })),
+  setSearchQuery: (q) => set({ searchQuery: q }),
   openEditor: (target) => set({ editor: target }),
   closeEditor: () => set({ editor: null }),
 
@@ -74,6 +85,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       ? get().events.find((e) => e.id === input.id)
       : undefined
     const range = defaultEventRange(get().anchorDate)
+    const recurrence: RecurrenceRule =
+      input.recurrence ?? existing?.recurrence ?? { ...DEFAULT_RECURRENCE }
     const event: CalendarEvent = {
       id,
       title: input.title.trim() || '未命名事件',
@@ -83,18 +96,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       color: (input.color ?? existing?.color ?? 'teal') as ItemColor,
       note: input.note ?? existing?.note ?? '',
       completed: input.completed ?? existing?.completed ?? false,
+      recurrence,
+      remindMinutes:
+        input.remindMinutes !== undefined
+          ? input.remindMinutes
+          : (existing?.remindMinutes ?? null),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     }
     await db.events.put(event)
-    const events = await db.events.toArray()
+    const events = (await db.events.toArray()).map(normalizeEvent)
     set({ events })
     return id
   },
 
   deleteEvent: async (id) => {
     await db.events.delete(id)
-    const events = await db.events.toArray()
+    const events = (await db.events.toArray()).map(normalizeEvent)
     set({ events, editor: null })
   },
 
@@ -140,6 +158,30 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!event) return
     await get().upsertEvent({ ...event, completed: !event.completed })
   },
+
+  moveEventTimes: async (id, start, end) => {
+    const event = get().events.find((e) => e.id === id)
+    if (!event) return
+    // 重复事件：只改系列的时刻与时长，保留模板日期
+    if (event.recurrence.freq !== 'none') {
+      const oldStart = new Date(event.start)
+      const nextStart = new Date(oldStart)
+      nextStart.setHours(start.getHours(), start.getMinutes(), 0, 0)
+      const duration = end.getTime() - start.getTime()
+      const nextEnd = new Date(nextStart.getTime() + duration)
+      await get().upsertEvent({
+        ...event,
+        start: nextStart.toISOString(),
+        end: nextEnd.toISOString(),
+      })
+      return
+    }
+    await get().upsertEvent({
+      ...event,
+      start: start.toISOString(),
+      end: end.toISOString(),
+    })
+  },
 }))
 
 function startOfLocalDay(date: Date): Date {
@@ -164,6 +206,8 @@ async function seedDemo() {
       color: 'teal',
       note: '处理最重要的一件事',
       completed: false,
+      recurrence: { ...DEFAULT_RECURRENCE },
+      remindMinutes: 10,
       createdAt: now,
       updatedAt: now,
     },
@@ -176,6 +220,8 @@ async function seedDemo() {
       color: 'sky',
       note: '',
       completed: false,
+      recurrence: { freq: 'weekly', interval: 1, until: null },
+      remindMinutes: null,
       createdAt: now,
       updatedAt: now,
     },

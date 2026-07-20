@@ -1,5 +1,7 @@
 import { useAppStore } from '../store'
 import { formatDayLabel, formatMonthDay, getWeekDays, shiftDay } from '../utils/date'
+import { exportLuminaIcs } from '../utils/ics'
+import { ensureNotificationPermission } from '../utils/reminders'
 
 export function Header() {
   const viewMode = useAppStore((s) => s.viewMode)
@@ -9,6 +11,10 @@ export function Header() {
   const filters = useAppStore((s) => s.filters)
   const setFilters = useAppStore((s) => s.setFilters)
   const openEditor = useAppStore((s) => s.openEditor)
+  const searchQuery = useAppStore((s) => s.searchQuery)
+  const setSearchQuery = useAppStore((s) => s.setSearchQuery)
+  const events = useAppStore((s) => s.events)
+  const todos = useAppStore((s) => s.todos)
 
   const label =
     viewMode === 'day'
@@ -77,6 +83,17 @@ export function Header() {
           </button>
         </div>
 
+        <label className="search-box">
+          <span className="sr-only">搜索</span>
+          <input
+            id="lumina-search"
+            type="search"
+            placeholder="搜索标题…  /"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </label>
+
         <div className="filters" aria-label="显示筛选">
           <label className="filter-check">
             <input
@@ -100,6 +117,22 @@ export function Header() {
           <button
             type="button"
             className="ghost-btn"
+            title="导出 ICS"
+            onClick={() => exportLuminaIcs(events, todos)}
+          >
+            导出
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            title="开启浏览器提醒"
+            onClick={() => void ensureNotificationPermission()}
+          >
+            提醒权限
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
             onClick={() => openEditor({ kind: 'todo', id: null })}
           >
             + 待办
@@ -113,6 +146,10 @@ export function Header() {
           </button>
         </div>
       </div>
+      <p className="shortcut-hint">
+        快捷键：<kbd>N</kbd> 新事件 · <kbd>Shift+N</kbd> 新待办 · <kbd>T</kbd> 今天 ·{' '}
+        <kbd>D</kbd>/<kbd>W</kbd> 日/周 · <kbd>/</kbd> 搜索 · <kbd>Esc</kbd> 关闭
+      </p>
     </header>
   )
 }
