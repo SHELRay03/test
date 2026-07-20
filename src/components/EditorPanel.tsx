@@ -1,8 +1,10 @@
 import { format, parseISO } from 'date-fns'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../store'
-import type { ItemColor } from '../types'
+import type { ItemColor, RecurrenceFreq } from '../types'
+import { DEFAULT_RECURRENCE } from '../types'
 import { toDateKey } from '../utils/date'
+import { ensureNotificationPermission } from '../utils/reminders'
 
 const COLORS: { value: ItemColor; label: string }[] = [
   { value: 'teal', label: '青绿' },
@@ -10,6 +12,15 @@ const COLORS: { value: ItemColor; label: string }[] = [
   { value: 'amber', label: '琥珀' },
   { value: 'rose', label: '玫褐' },
   { value: 'slate', label: '岩灰' },
+]
+
+const REMIND_OPTIONS: { value: number | null; label: string }[] = [
+  { value: null, label: '不提醒' },
+  { value: 0, label: '开始时' },
+  { value: 5, label: '提前 5 分钟' },
+  { value: 10, label: '提前 10 分钟' },
+  { value: 30, label: '提前 30 分钟' },
+  { value: 60, label: '提前 1 小时' },
 ]
 
 export function EditorPanel() {
@@ -39,6 +50,10 @@ export function EditorPanel() {
   const [endLocal, setEndLocal] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [completed, setCompleted] = useState(false)
+  const [freq, setFreq] = useState<RecurrenceFreq>('none')
+  const [interval, setInterval] = useState(1)
+  const [until, setUntil] = useState('')
+  const [remindMinutes, setRemindMinutes] = useState<number | null>(null)
 
   useEffect(() => {
     if (!editor) return
@@ -52,6 +67,11 @@ export function EditorPanel() {
       setCompleted(base?.completed ?? false)
       setStartLocal(toLocalInput(start))
       setEndLocal(toLocalInput(end))
+      const r = base?.recurrence ?? DEFAULT_RECURRENCE
+      setFreq(r.freq)
+      setInterval(r.interval)
+      setUntil(r.until ?? '')
+      setRemindMinutes(base?.remindMinutes ?? null)
     } else {
       setTitle(existingTodo?.title ?? '')
       setNote(existingTodo?.note ?? '')
@@ -68,6 +88,9 @@ export function EditorPanel() {
 
   async function save() {
     if (isEvent) {
+      if (remindMinutes != null) {
+        await ensureNotificationPermission()
+      }
       await upsertEvent({
         id: editor!.id ?? undefined,
         title,
@@ -76,6 +99,12 @@ export function EditorPanel() {
         completed,
         start: fromLocalInput(startLocal),
         end: fromLocalInput(endLocal),
+        recurrence: {
+          freq,
+          interval: Math.max(1, interval),
+          until: until || null,
+        },
+        remindMinutes,
       })
     } else {
       await upsertTodo({
@@ -121,26 +150,90 @@ export function EditorPanel() {
         </div>
 
         {isEvent ? (
-          <div className="datetime-stack">
-            <div className="field">
-              <label htmlFor="start">开始</label>
-              <input
-                id="start"
-                type="datetime-local"
-                value={startLocal}
-                onChange={(e) => setStartLocal(e.target.value)}
-              />
+          <>
+            <div className="datetime-stack">
+              <div className="field">
+                <label htmlFor="start">开始</label>
+                <input
+                  id="start"
+                  type="datetime-local"
+                  value={startLocal}
+                  onChange={(e) => setStartLocal(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="end">结束</label>
+                <input
+                  id="end"
+                  type="datetime-local"
+                  value={endLocal}
+                  onChange={(e) => setEndLocal(e.target.value)}
+                />
+              </div>
             </div>
+
             <div className="field">
-              <label htmlFor="end">结束</label>
-              <input
-                id="end"
-                type="datetime-local"
-                value={endLocal}
-                onChange={(e) => setEndLocal(e.target.value)}
-              />
+              <label htmlFor="freq">重复</label>
+              <select
+                id="freq"
+                value={freq}
+                onChange={(e) => setFreq(e.target.value as RecurrenceFreq)}
+              >
+                <option value="none">不重复</option>
+                <option value="daily">每天</option>
+                <option value="weekly">每周</option>
+                <option value="custom">自定义间隔（天）</option>
+              </select>
             </div>
-          </div>
+
+            {freq !== 'none' && (
+              <div className="datetime-stack">
+                <div className="field">
+                  <label htmlFor="interval">
+                    {freq === 'weekly' ? '每几周' : '每几天'}
+                  </label>
+                  <input
+                    id="interval"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={interval}
+                    onChange={(e) => setInterval(Number(e.target.value) || 1)}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="until">结束于（可选）</label>
+                  <input
+                    id="until"
+                    type="date"
+                    value={until}
+                    onChange={(e) => setUntil(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="field">
+              <label htmlFor="remind">提醒</label>
+              <select
+                id="remind"
+                value={remindMinutes === null ? 'null' : String(remindMinutes)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setRemindMinutes(v === 'null' ? null : Number(v))
+                }}
+              >
+                {REMIND_OPTIONS.map((o) => (
+                  <option
+                    key={String(o.value)}
+                    value={o.value === null ? 'null' : String(o.value)}
+                  >
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         ) : (
           <div className="field">
             <label htmlFor="due">截止日期</label>

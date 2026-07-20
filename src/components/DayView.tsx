@@ -1,4 +1,3 @@
-import { parseISO } from 'date-fns'
 import { useMemo } from 'react'
 import { useAppStore } from '../store'
 import {
@@ -6,17 +5,19 @@ import {
   HOUR_START,
   PX_PER_MINUTE,
   TIMELINE_HEIGHT,
-  eventOverlapsDay,
-  formatTime,
+  eventsForDay,
   minutesFromMidnight,
 } from '../utils/date'
+import { DraggableEvent } from './DraggableEvent'
 import { TodoSection } from './TodoSection'
 
 export function DayView() {
   const anchorDate = useAppStore((s) => s.anchorDate)
   const events = useAppStore((s) => s.events)
   const showEvents = useAppStore((s) => s.filters.showEvents)
+  const searchQuery = useAppStore((s) => s.searchQuery)
   const openEditor = useAppStore((s) => s.openEditor)
+  const moveEventTimes = useAppStore((s) => s.moveEventTimes)
 
   const hours = useMemo(
     () => Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i),
@@ -25,18 +26,11 @@ export function DayView() {
 
   const dayEvents = useMemo(() => {
     if (!showEvents) return []
-    return events
-      .filter((e) => eventOverlapsDay(e.start, e.end, anchorDate))
-      .map((e) => {
-        const start = parseISO(e.start)
-        const end = parseISO(e.end)
-        const startMin = Math.max(minutesFromMidnight(start), HOUR_START * 60)
-        const endMin = Math.min(minutesFromMidnight(end), HOUR_END * 60)
-        const top = (startMin - HOUR_START * 60) * PX_PER_MINUTE
-        const height = Math.max((endMin - startMin) * PX_PER_MINUTE, 28)
-        return { event: e, top, height, start, end }
-      })
-  }, [anchorDate, events, showEvents])
+    const q = searchQuery.trim().toLowerCase()
+    return eventsForDay(events, anchorDate).filter(
+      (o) => !q || o.event.title.toLowerCase().includes(q),
+    )
+  }, [anchorDate, events, showEvents, searchQuery])
 
   const now = new Date()
   const showNow =
@@ -51,6 +45,7 @@ export function DayView() {
 
       <div className="section-head">
         <h2>时间轴</h2>
+        <span className="hint-inline">拖动事件改时间，底边拉时长</span>
       </div>
 
       {!showEvents ? (
@@ -66,19 +61,17 @@ export function DayView() {
           </div>
           <div className="timeline-canvas">
             {showNow && <div className="now-line" style={{ top: nowTop }} />}
-            {dayEvents.map(({ event, top, height, start, end }) => (
-              <button
-                key={event.id}
-                type="button"
-                className={`event-block color-${event.color} ${event.completed ? 'done' : ''}`}
-                style={{ top, height }}
-                onClick={() => openEditor({ kind: 'event', id: event.id })}
-              >
-                <span className="t">{event.title}</span>
-                <span className="m">
-                  {formatTime(start)} – {formatTime(end)}
-                </span>
-              </button>
+            {dayEvents.map((occ) => (
+              <DraggableEvent
+                key={occ.occurrenceId}
+                occurrence={occ}
+                day={anchorDate}
+                pxPerMinute={PX_PER_MINUTE}
+                onOpen={() => openEditor({ kind: 'event', id: occ.event.id })}
+                onCommit={({ start, end }) => {
+                  void moveEventTimes(occ.event.id, start, end)
+                }}
+              />
             ))}
           </div>
         </div>
