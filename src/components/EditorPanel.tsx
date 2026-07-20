@@ -186,27 +186,28 @@ export function EditorPanel() {
           />
         </div>
 
-        <label className="filter-check">
-          <input
-            type="checkbox"
-            checked={completed}
-            onChange={(e) => setCompleted(e.target.checked)}
-          />
-          已完成
-        </label>
-
-        <div className="editor-actions">
-          <button type="button" className="primary-btn" onClick={() => void save()}>
-            保存
-          </button>
-          <button type="button" className="ghost-btn" onClick={closeEditor}>
-            取消
-          </button>
-          {!isNew && (
-            <button type="button" className="danger-btn" onClick={() => void remove()}>
-              删除
+        <div className="editor-footer">
+          <label className="filter-check">
+            <input
+              type="checkbox"
+              checked={completed}
+              onChange={(e) => setCompleted(e.target.checked)}
+            />
+            已完成
+          </label>
+          <div className="editor-actions">
+            <button type="button" className="primary-btn" onClick={() => void save()}>
+              保存
             </button>
-          )}
+            <button type="button" className="ghost-btn" onClick={closeEditor}>
+              取消
+            </button>
+            {!isNew && (
+              <button type="button" className="danger-btn" onClick={() => void remove()}>
+                删除
+              </button>
+            )}
+          </div>
         </div>
       </aside>
     </>

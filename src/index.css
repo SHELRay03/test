@@ -582,8 +582,30 @@ input:focus:not(:focus-visible) {
   border: 0;
   outline: none;
   box-shadow: none;
-  background: rgba(18, 40, 36, 0.22);
-  backdrop-filter: blur(2px);
+  /* 自侧栏一侧（右）向左：遮罩与模糊逐渐减弱 */
+  background: linear-gradient(
+    to left,
+    rgba(18, 48, 42, 0.34) 0%,
+    rgba(18, 48, 42, 0.2) 28%,
+    rgba(18, 48, 42, 0.08) 58%,
+    rgba(18, 48, 42, 0) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  -webkit-mask-image: linear-gradient(
+    to left,
+    #000 0%,
+    rgba(0, 0, 0, 0.85) 32%,
+    rgba(0, 0, 0, 0.35) 62%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to left,
+    #000 0%,
+    rgba(0, 0, 0, 0.85) 32%,
+    rgba(0, 0, 0, 0.35) 62%,
+    transparent 100%
+  );
   z-index: 40;
   animation: rise-in 0.2s ease both;
   cursor: pointer;
@@ -721,11 +743,26 @@ input:focus:not(:focus-visible) {
   line-height: 1;
 }
 
-.editor-actions {
-  margin-top: auto;
+.editor-footer {
+  margin-top: 0.25rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 0.85rem;
+}
+
+.editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.editor-actions .primary-btn,
+.editor-actions .ghost-btn,
+.editor-actions .danger-btn {
+  padding: 0.4rem 0.85rem;
 }
 
 .loading {
