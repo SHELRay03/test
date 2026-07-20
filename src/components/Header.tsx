@@ -24,7 +24,7 @@ export function Header() {
           <h1 className="brand-title">
             Lumina <em>Memo</em>
           </h1>
-          <p className="brand-tagline">看清今天，轻轻安排接下来的事。</p>
+          <p className="brand-tagline">让每一束流光，都有迹可寻。</p>
         </div>
       </div>
 
