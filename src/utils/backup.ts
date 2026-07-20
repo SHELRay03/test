@@ -49,7 +49,10 @@ export function parseBackupJson(text: string): LuminaBackup {
       remindMinutes: e.remindMinutes ?? null,
       allDay: Boolean(e.allDay),
     })),
-    todos: raw.todos,
+    todos: raw.todos.map((t, index) => ({
+      ...t,
+      order: typeof t.order === 'number' ? t.order : index,
+    })),
   }
 }
 
