@@ -10,6 +10,8 @@ export interface RecurrenceRule {
   interval: number
   /** 结束日期 yyyy-MM-dd，null 表示无限（展示窗口内展开） */
   until: string | null
+  /** 排除的日期（只改这一次时写入） */
+  exdates: string[]
 }
 
 export interface CalendarEvent {
@@ -37,6 +39,11 @@ export interface EventOccurrence {
   isOccurrence: boolean
 }
 
+export interface LaidOutOccurrence extends EventOccurrence {
+  col: number
+  colCount: number
+}
+
 export interface TodoItem {
   id: string
   title: string
@@ -58,8 +65,18 @@ export interface DisplayFilters {
   showTodos: boolean
 }
 
+export type RecurrenceScope = 'this' | 'all'
+
+export interface PendingMove {
+  eventId: string
+  occurrenceDayKey: string
+  start: string
+  end: string
+}
+
 export const DEFAULT_RECURRENCE: RecurrenceRule = {
   freq: 'none',
   interval: 1,
   until: null,
+  exdates: [],
 }

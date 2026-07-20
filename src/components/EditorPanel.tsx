@@ -54,6 +54,7 @@ export function EditorPanel() {
   const [interval, setInterval] = useState(1)
   const [until, setUntil] = useState('')
   const [remindMinutes, setRemindMinutes] = useState<number | null>(null)
+  const [allDay, setAllDay] = useState(false)
 
   useEffect(() => {
     if (!editor) return
@@ -72,6 +73,7 @@ export function EditorPanel() {
       setInterval(r.interval)
       setUntil(r.until ?? '')
       setRemindMinutes(base?.remindMinutes ?? null)
+      setAllDay(base?.allDay ?? false)
     } else {
       setTitle(existingTodo?.title ?? '')
       setNote(existingTodo?.note ?? '')
@@ -97,12 +99,14 @@ export function EditorPanel() {
         note,
         color,
         completed,
+        allDay,
         start: fromLocalInput(startLocal),
         end: fromLocalInput(endLocal),
         recurrence: {
           freq,
           interval: Math.max(1, interval),
           until: until || null,
+          exdates: existingEvent?.recurrence?.exdates ?? [],
         },
         remindMinutes,
       })
@@ -159,6 +163,7 @@ export function EditorPanel() {
                   type="datetime-local"
                   value={startLocal}
                   onChange={(e) => setStartLocal(e.target.value)}
+                  disabled={allDay}
                 />
               </div>
               <div className="field">
@@ -168,9 +173,19 @@ export function EditorPanel() {
                   type="datetime-local"
                   value={endLocal}
                   onChange={(e) => setEndLocal(e.target.value)}
+                  disabled={allDay}
                 />
               </div>
             </div>
+
+            <label className="filter-check">
+              <input
+                type="checkbox"
+                checked={allDay}
+                onChange={(e) => setAllDay(e.target.checked)}
+              />
+              全天事件
+            </label>
 
             <div className="field">
               <label htmlFor="freq">重复</label>

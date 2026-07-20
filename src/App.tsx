@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { DayView } from './components/DayView'
 import { EditorPanel } from './components/EditorPanel'
 import { Header } from './components/Header'
+import { RecurrenceScopeDialog } from './components/RecurrenceScopeDialog'
 import { WeekView } from './components/WeekView'
 import { useAppStore } from './store'
 import { startReminderLoop } from './utils/reminders'
@@ -12,6 +13,8 @@ export default function App() {
   const viewMode = useAppStore((s) => s.viewMode)
   const editor = useAppStore((s) => s.editor)
   const closeEditor = useAppStore((s) => s.closeEditor)
+  const pendingMove = useAppStore((s) => s.pendingMove)
+  const cancelPendingMove = useAppStore((s) => s.cancelPendingMove)
 
   useEffect(() => {
     void hydrate()
@@ -24,14 +27,20 @@ export default function App() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && editor) {
+      if (e.key !== 'Escape') return
+      if (pendingMove) {
+        e.preventDefault()
+        cancelPendingMove()
+        return
+      }
+      if (editor) {
         e.preventDefault()
         closeEditor()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editor, closeEditor])
+  }, [editor, closeEditor, pendingMove, cancelPendingMove])
 
   if (!ready) {
     return <div className="loading">Lumina Memo</div>
@@ -44,6 +53,7 @@ export default function App() {
         {viewMode === 'day' ? <DayView /> : <WeekView />}
       </main>
       <EditorPanel />
+      <RecurrenceScopeDialog />
     </div>
   )
 }

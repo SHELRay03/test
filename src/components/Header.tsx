@@ -4,6 +4,7 @@ import { formatDayLabel, formatMonthDay, getWeekDays, shiftDay } from '../utils/
 import { exportLuminaIcs } from '../utils/ics'
 import { ensureNotificationPermission } from '../utils/reminders'
 import { searchItems, type SearchHit, uniqueDayKey } from '../utils/search'
+import { downloadJsonBackup, parseBackupJson, pickBackupFile } from '../utils/backup'
 
 export function Header() {
   const viewMode = useAppStore((s) => s.viewMode)
@@ -15,6 +16,23 @@ export function Header() {
   const openEditor = useAppStore((s) => s.openEditor)
   const events = useAppStore((s) => s.events)
   const todos = useAppStore((s) => s.todos)
+  const replaceAllData = useAppStore((s) => s.replaceAllData)
+
+  async function importBackup() {
+    const file = await pickBackupFile()
+    if (!file) return
+    try {
+      const text = await file.text()
+      const backup = parseBackupJson(text)
+      const ok = window.confirm(
+        `将用备份覆盖当前全部数据（事件 ${backup.events.length}、待办 ${backup.todos.length}）。确定吗？`,
+      )
+      if (!ok) return
+      await replaceAllData(backup)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '恢复失败')
+    }
+  }
 
   const label =
     viewMode === 'day'
@@ -108,10 +126,26 @@ export function Header() {
           <button
             type="button"
             className="ghost-btn"
+            title="导出 JSON 备份"
+            onClick={() => downloadJsonBackup(events, todos)}
+          >
+            备份
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            title="从 JSON 恢复"
+            onClick={() => void importBackup()}
+          >
+            恢复
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
             title="导出 ICS"
             onClick={() => exportLuminaIcs(events, todos)}
           >
-            导出
+            ICS
           </button>
           <button
             type="button"
@@ -119,7 +153,7 @@ export function Header() {
             title="开启浏览器提醒"
             onClick={() => void ensureNotificationPermission()}
           >
-            提醒权限
+            提醒
           </button>
           <button
             type="button"

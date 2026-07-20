@@ -26,6 +26,24 @@ class LuminaDB extends Dexie {
             if (event.remindMinutes === undefined) event.remindMinutes = null
           })
       })
+    this.version(3)
+      .stores({
+        events: 'id, start, end, completed',
+        todos: 'id, dueDate, completed',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('events')
+          .toCollection()
+          .modify((event: Partial<CalendarEvent>) => {
+            if (!event.recurrence) {
+              event.recurrence = { ...DEFAULT_RECURRENCE }
+            } else if (!event.recurrence.exdates) {
+              event.recurrence = { ...event.recurrence, exdates: [] }
+            }
+            if (event.allDay === undefined) event.allDay = false
+          })
+      })
   }
 }
 
@@ -34,7 +52,12 @@ export const db = new LuminaDB()
 export function normalizeEvent(raw: CalendarEvent): CalendarEvent {
   return {
     ...raw,
-    recurrence: raw.recurrence ?? { ...DEFAULT_RECURRENCE },
+    allDay: Boolean(raw.allDay),
+    recurrence: {
+      ...DEFAULT_RECURRENCE,
+      ...raw.recurrence,
+      exdates: raw.recurrence?.exdates ?? [],
+    },
     remindMinutes: raw.remindMinutes ?? null,
   }
 }
