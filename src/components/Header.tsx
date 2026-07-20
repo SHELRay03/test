@@ -1,7 +1,9 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../store'
 import { formatDayLabel, formatMonthDay, getWeekDays, shiftDay } from '../utils/date'
 import { exportLuminaIcs } from '../utils/ics'
 import { ensureNotificationPermission } from '../utils/reminders'
+import { searchItems, type SearchHit, uniqueDayKey } from '../utils/search'
 
 export function Header() {
   const viewMode = useAppStore((s) => s.viewMode)
@@ -11,8 +13,6 @@ export function Header() {
   const filters = useAppStore((s) => s.filters)
   const setFilters = useAppStore((s) => s.setFilters)
   const openEditor = useAppStore((s) => s.openEditor)
-  const searchQuery = useAppStore((s) => s.searchQuery)
-  const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const events = useAppStore((s) => s.events)
   const todos = useAppStore((s) => s.todos)
 
@@ -83,16 +83,7 @@ export function Header() {
           </button>
         </div>
 
-        <label className="search-box">
-          <span className="sr-only">搜索</span>
-          <input
-            id="lumina-search"
-            type="search"
-            placeholder="搜索标题…  /"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </label>
+        <SearchJump events={events} todos={todos} />
 
         <div className="filters" aria-label="显示筛选">
           <label className="filter-check">
@@ -146,10 +137,149 @@ export function Header() {
           </button>
         </div>
       </div>
-      <p className="shortcut-hint">
-        快捷键：<kbd>N</kbd> 新事件 · <kbd>Shift+N</kbd> 新待办 · <kbd>T</kbd> 今天 ·{' '}
-        <kbd>D</kbd>/<kbd>W</kbd> 日/周 · <kbd>/</kbd> 搜索 · <kbd>Esc</kbd> 关闭
-      </p>
     </header>
+  )
+}
+
+function SearchJump({
+  events,
+  todos,
+}: {
+  events: ReturnType<typeof useAppStore.getState>['events']
+  todos: ReturnType<typeof useAppStore.getState>['todos']
+}) {
+  const setAnchorDate = useAppStore((s) => s.setAnchorDate)
+  const setViewMode = useAppStore((s) => s.setViewMode)
+  const openEditor = useAppStore((s) => s.openEditor)
+
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
+  const [activeIndex, setActiveIndex] = useState(0)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  const hits = useMemo(
+    () => searchItems(query, events, todos),
+    [query, events, todos],
+  )
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  function goToHit(hit: SearchHit) {
+    setAnchorDate(hit.day)
+    setViewMode('day')
+    openEditor({ kind: hit.kind, id: hit.id })
+    setOpen(false)
+    setMessage('')
+    setQuery('')
+  }
+
+  function runSearch(nextQuery = query) {
+    const q = nextQuery.trim()
+    if (!q) {
+      setOpen(false)
+      setMessage('')
+      return
+    }
+    const results = searchItems(q, events, todos)
+    if (results.length === 0) {
+      setOpen(true)
+      setMessage('没有找到匹配的事件或待办')
+      setActiveIndex(0)
+      return
+    }
+
+    if (results.length === 1) {
+      goToHit(results[0])
+      return
+    }
+
+    const oneDay = uniqueDayKey(results)
+    setOpen(true)
+    setMessage(
+      oneDay
+        ? `找到 ${results.length} 条，请选择`
+        : `找到 ${results.length} 条，分布在多天，请选择`,
+    )
+    setActiveIndex(0)
+  }
+
+  return (
+    <div className="search-box" ref={wrapRef}>
+      <label className="sr-only" htmlFor="lumina-search">
+        搜索并跳转
+      </label>
+      <input
+        id="lumina-search"
+        type="search"
+        placeholder="输入关键词，回车跳转…"
+        value={query}
+        autoComplete="off"
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setMessage('')
+          if (!e.target.value.trim()) setOpen(false)
+        }}
+        onFocus={() => {
+          if (hits.length > 1 || message) setOpen(true)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            setOpen(false)
+            ;(e.target as HTMLInputElement).blur()
+            return
+          }
+          if (e.key === 'ArrowDown' && open && hits.length) {
+            e.preventDefault()
+            setActiveIndex((i) => Math.min(i + 1, hits.length - 1))
+            return
+          }
+          if (e.key === 'ArrowUp' && open && hits.length) {
+            e.preventDefault()
+            setActiveIndex((i) => Math.max(i - 1, 0))
+            return
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            if (open && hits.length > 0) {
+              goToHit(hits[activeIndex] ?? hits[0])
+              return
+            }
+            runSearch()
+          }
+        }}
+      />
+      {open && (
+        <div className="search-results" role="listbox" aria-label="搜索结果">
+          {message && <p className="search-results-meta">{message}</p>}
+          {hits.length > 0 &&
+            hits.map((hit, index) => (
+              <button
+                key={`${hit.kind}-${hit.id}-${hit.dayKey}-${index}`}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                className={`search-result-item ${index === activeIndex ? 'active' : ''}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => goToHit(hit)}
+              >
+                <span className={`search-kind ${hit.kind}`}>
+                  {hit.kind === 'event' ? '事件' : '待办'}
+                </span>
+                <span className="search-title">{hit.title}</span>
+                <span className="search-time">{hit.timeLabel}</span>
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
   )
 }

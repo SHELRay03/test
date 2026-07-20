@@ -15,7 +15,6 @@ export function DayView() {
   const anchorDate = useAppStore((s) => s.anchorDate)
   const events = useAppStore((s) => s.events)
   const showEvents = useAppStore((s) => s.filters.showEvents)
-  const searchQuery = useAppStore((s) => s.searchQuery)
   const openEditor = useAppStore((s) => s.openEditor)
   const moveEventTimes = useAppStore((s) => s.moveEventTimes)
 
@@ -26,11 +25,8 @@ export function DayView() {
 
   const dayEvents = useMemo(() => {
     if (!showEvents) return []
-    const q = searchQuery.trim().toLowerCase()
-    return eventsForDay(events, anchorDate).filter(
-      (o) => !q || o.event.title.toLowerCase().includes(q),
-    )
-  }, [anchorDate, events, showEvents, searchQuery])
+    return eventsForDay(events, anchorDate)
+  }, [anchorDate, events, showEvents])
 
   const now = new Date()
   const showNow =
