@@ -88,10 +88,13 @@ export function DateNav({
         className={`date-trigger ${open ? 'open' : ''}`}
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={viewMode === 'week' ? '点击选择某一周' : '点击选择日期'}
+        title={viewMode === 'week' ? '点击打开日历，选择某一周' : '点击打开日历，精确选择日期'}
         onClick={() => setOpen((v) => !v)}
       >
-        {label}
+        <span className="date-trigger-text">{label}</span>
+        <span className="date-trigger-caret" aria-hidden="true">
+          ▾
+        </span>
       </button>
       <button
         type="button"
