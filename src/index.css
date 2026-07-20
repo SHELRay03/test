@@ -262,14 +262,29 @@ input:focus:not(:focus-visible) {
 
 .date-trigger {
   min-width: 7.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--surface);
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 0.7rem;
   font-weight: 600;
   font-size: 0.9rem;
   white-space: nowrap;
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.date-trigger-caret {
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  line-height: 1;
+}
+
+.date-trigger:hover .date-trigger-caret,
+.date-trigger.open .date-trigger-caret {
+  color: var(--accent);
 }
 
 .date-trigger:hover,
@@ -400,6 +415,12 @@ input:focus:not(:focus-visible) {
 
 .menu-panel button:hover {
   background: var(--accent-soft);
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 0.2rem 0.35rem;
+  background: var(--line);
 }
 
 .main-panel {

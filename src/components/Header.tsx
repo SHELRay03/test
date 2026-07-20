@@ -98,7 +98,7 @@ export function Header() {
         </div>
 
         <div className="fab-row">
-          <DataMenu
+          <BackupMenu
             onBackup={() => downloadJsonBackup(events, todos)}
             onRestore={() => void importBackup()}
             onIcs={() => exportLuminaIcs(events, todos)}
@@ -124,7 +124,7 @@ export function Header() {
   )
 }
 
-function DataMenu({
+function BackupMenu({
   onBackup,
   onRestore,
   onIcs,
@@ -153,9 +153,10 @@ function DataMenu({
         className="ghost-btn compact"
         aria-haspopup="menu"
         aria-expanded={open}
+        title="备份与恢复"
         onClick={() => setOpen((v) => !v)}
       >
-        数据 ▾
+        备份 ▾
       </button>
       {open && (
         <div className="menu-panel" role="menu">
@@ -179,6 +180,7 @@ function DataMenu({
           >
             恢复备份
           </button>
+          <div className="menu-sep" role="separator" />
           <button
             type="button"
             role="menuitem"
