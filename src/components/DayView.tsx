@@ -56,13 +56,15 @@ export function DayView() {
       {!showEvents ? (
         <p className="empty-hint">已隐藏事件。勾选上方「事件」即可显示。</p>
       ) : (
-        <div className="timeline">
-          {hours.map((h) => (
-            <div key={h} className="hour-row">
-              <span className="hour-label">{String(h).padStart(2, '0')}:00</span>
-            </div>
-          ))}
-          <div className="timeline-canvas" style={{ height: TIMELINE_HEIGHT }}>
+        <div className="timeline" style={{ height: TIMELINE_HEIGHT }}>
+          <div className="timeline-hours" aria-hidden="true">
+            {hours.map((h) => (
+              <div key={h} className="hour-row">
+                <span className="hour-label">{String(h).padStart(2, '0')}:00</span>
+              </div>
+            ))}
+          </div>
+          <div className="timeline-canvas">
             {showNow && <div className="now-line" style={{ top: nowTop }} />}
             {dayEvents.map(({ event, top, height, start, end }) => (
               <button
