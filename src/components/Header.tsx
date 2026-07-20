@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAppStore } from '../store'
 import { shiftDay } from '../utils/date'
 import { exportLuminaIcs } from '../utils/ics'
 import { ensureNotificationPermission } from '../utils/reminders'
 import { searchItems, type SearchHit, uniqueDayKey } from '../utils/search'
 import { downloadJsonBackup, parseBackupJson, pickBackupFile } from '../utils/backup'
+import { useFixedPopover } from '../utils/useFixedPopover'
 import { DateNav } from './DateNav'
 
 export function Header() {
@@ -136,19 +138,26 @@ function BackupMenu({
   onRemind: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const panelStyle = useFixedPopover(open, triggerRef, 'end', 160)
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (wrapRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
 
   return (
-    <div className="menu-wrap" ref={ref}>
+    <div className="menu-wrap" ref={wrapRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="ghost-btn compact"
         aria-haspopup="menu"
@@ -158,51 +167,58 @@ function BackupMenu({
       >
         备份 ▾
       </button>
-      {open && (
-        <div className="menu-panel" role="menu">
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onBackup()
-              setOpen(false)
-            }}
+      {open &&
+        createPortal(
+          <div
+            ref={panelRef}
+            className="menu-panel is-fixed"
+            role="menu"
+            style={panelStyle}
           >
-            导出备份
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onRestore()
-              setOpen(false)
-            }}
-          >
-            恢复备份
-          </button>
-          <div className="menu-sep" role="separator" />
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onIcs()
-              setOpen(false)
-            }}
-          >
-            导出 ICS
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onRemind()
-              setOpen(false)
-            }}
-          >
-            提醒权限
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onBackup()
+                setOpen(false)
+              }}
+            >
+              导出备份
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onRestore()
+                setOpen(false)
+              }}
+            >
+              恢复备份
+            </button>
+            <div className="menu-sep" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onIcs()
+                setOpen(false)
+              }}
+            >
+              导出 ICS
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onRemind()
+                setOpen(false)
+              }}
+            >
+              提醒权限
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
@@ -223,6 +239,9 @@ function SearchJump({
   const [message, setMessage] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const panelStyle = useFixedPopover(open, inputRef, 'start', 320)
 
   const hits = useMemo(
     () => searchItems(query, events, todos),
@@ -231,9 +250,10 @@ function SearchJump({
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      const target = e.target as Node
+      if (wrapRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
@@ -284,6 +304,7 @@ function SearchJump({
         搜索并跳转
       </label>
       <input
+        ref={inputRef}
         id="lumina-search"
         type="search"
         placeholder="搜索…"
@@ -323,29 +344,37 @@ function SearchJump({
           }
         }}
       />
-      {open && (
-        <div className="search-results" role="listbox" aria-label="搜索结果">
-          {message && <p className="search-results-meta">{message}</p>}
-          {hits.length > 0 &&
-            hits.map((hit, index) => (
-              <button
-                key={`${hit.kind}-${hit.id}-${hit.dayKey}-${index}`}
-                type="button"
-                role="option"
-                aria-selected={index === activeIndex}
-                className={`search-result-item ${index === activeIndex ? 'active' : ''}`}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => goToHit(hit)}
-              >
-                <span className={`search-kind ${hit.kind}`}>
-                  {hit.kind === 'event' ? '事件' : '待办'}
-                </span>
-                <span className="search-title">{hit.title}</span>
-                <span className="search-time">{hit.timeLabel}</span>
-              </button>
-            ))}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={panelRef}
+            className="search-results is-fixed"
+            role="listbox"
+            aria-label="搜索结果"
+            style={panelStyle}
+          >
+            {message && <p className="search-results-meta">{message}</p>}
+            {hits.length > 0 &&
+              hits.map((hit, index) => (
+                <button
+                  key={`${hit.kind}-${hit.id}-${hit.dayKey}-${index}`}
+                  type="button"
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  className={`search-result-item ${index === activeIndex ? 'active' : ''}`}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => goToHit(hit)}
+                >
+                  <span className={`search-kind ${hit.kind}`}>
+                    {hit.kind === 'event' ? '事件' : '待办'}
+                  </span>
+                  <span className="search-title">{hit.title}</span>
+                  <span className="search-time">{hit.timeLabel}</span>
+                </button>
+              ))}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

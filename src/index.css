@@ -136,13 +136,11 @@ input:focus:not(:focus-visible) {
 
 .toolbar {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem 0.55rem;
   margin-bottom: 1rem;
-  overflow-x: auto;
-  padding-bottom: 0.15rem;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 .segmented {
@@ -294,10 +292,6 @@ input:focus:not(:focus-visible) {
 }
 
 .date-popover {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  left: 0;
-  z-index: 35;
   width: min(292px, 86vw);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -305,6 +299,13 @@ input:focus:not(:focus-visible) {
   box-shadow: var(--shadow);
   padding: 0.75rem;
   animation: rise-in 0.18s ease both;
+}
+
+.date-popover:not(.is-fixed) {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 35;
 }
 
 .date-popover-head {
@@ -388,10 +389,6 @@ input:focus:not(:focus-visible) {
 }
 
 .menu-panel {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  right: 0;
-  z-index: 34;
   min-width: 8.5rem;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -401,6 +398,13 @@ input:focus:not(:focus-visible) {
   display: grid;
   gap: 0.15rem;
   animation: rise-in 0.16s ease both;
+}
+
+.menu-panel:not(.is-fixed) {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 34;
 }
 
 .menu-panel button {
@@ -727,19 +731,22 @@ input:focus:not(:focus-visible) {
 }
 
 .search-results {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  left: 0;
-  right: 0;
   min-width: min(320px, 80vw);
   max-height: min(320px, 50vh);
   overflow-y: auto;
-  z-index: 30;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface-strong);
   box-shadow: var(--shadow);
   padding: 0.35rem;
+}
+
+.search-results:not(.is-fixed) {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
 }
 
 .search-results-meta {
