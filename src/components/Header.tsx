@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../store'
-import { formatDayLabel, formatMonthDay, getWeekDays, shiftDay } from '../utils/date'
+import { shiftDay } from '../utils/date'
 import { exportLuminaIcs } from '../utils/ics'
 import { ensureNotificationPermission } from '../utils/reminders'
 import { searchItems, type SearchHit, uniqueDayKey } from '../utils/search'
 import { downloadJsonBackup, parseBackupJson, pickBackupFile } from '../utils/backup'
+import { DateNav } from './DateNav'
 
 export function Header() {
   const viewMode = useAppStore((s) => s.viewMode)
@@ -33,13 +34,6 @@ export function Header() {
       window.alert(err instanceof Error ? err.message : '恢复失败')
     }
   }
-
-  const label =
-    viewMode === 'day'
-      ? formatDayLabel(anchorDate)
-      : `${formatMonthDay(getWeekDays(anchorDate)[0])} – ${formatMonthDay(getWeekDays(anchorDate)[6])}`
-
-  const step = viewMode === 'day' ? 1 : 7
 
   return (
     <header>
@@ -74,32 +68,13 @@ export function Header() {
           </button>
         </div>
 
-        <div className="nav-row">
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="上一段"
-            onClick={() => setAnchorDate(shiftDay(anchorDate, -step))}
-          >
-            ‹
-          </button>
-          <div className="date-label">{label}</div>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="下一段"
-            onClick={() => setAnchorDate(shiftDay(anchorDate, step))}
-          >
-            ›
-          </button>
-          <button
-            type="button"
-            className="ghost-btn"
-            onClick={() => setAnchorDate(new Date())}
-          >
-            今天
-          </button>
-        </div>
+        <DateNav
+          viewMode={viewMode}
+          anchorDate={anchorDate}
+          onSelect={setAnchorDate}
+          onToday={() => setAnchorDate(new Date())}
+          onShift={(delta) => setAnchorDate(shiftDay(anchorDate, delta))}
+        />
 
         <SearchJump events={events} todos={todos} />
 
@@ -123,48 +98,22 @@ export function Header() {
         </div>
 
         <div className="fab-row">
+          <DataMenu
+            onBackup={() => downloadJsonBackup(events, todos)}
+            onRestore={() => void importBackup()}
+            onIcs={() => exportLuminaIcs(events, todos)}
+            onRemind={() => void ensureNotificationPermission()}
+          />
           <button
             type="button"
-            className="ghost-btn"
-            title="导出 JSON 备份"
-            onClick={() => downloadJsonBackup(events, todos)}
-          >
-            备份
-          </button>
-          <button
-            type="button"
-            className="ghost-btn"
-            title="从 JSON 恢复"
-            onClick={() => void importBackup()}
-          >
-            恢复
-          </button>
-          <button
-            type="button"
-            className="ghost-btn"
-            title="导出 ICS"
-            onClick={() => exportLuminaIcs(events, todos)}
-          >
-            ICS
-          </button>
-          <button
-            type="button"
-            className="ghost-btn"
-            title="开启浏览器提醒"
-            onClick={() => void ensureNotificationPermission()}
-          >
-            提醒
-          </button>
-          <button
-            type="button"
-            className="ghost-btn"
+            className="ghost-btn compact"
             onClick={() => openEditor({ kind: 'todo', id: null })}
           >
             + 待办
           </button>
           <button
             type="button"
-            className="primary-btn"
+            className="primary-btn compact"
             onClick={() => openEditor({ kind: 'event', id: null })}
           >
             + 事件
@@ -172,6 +121,87 @@ export function Header() {
         </div>
       </div>
     </header>
+  )
+}
+
+function DataMenu({
+  onBackup,
+  onRestore,
+  onIcs,
+  onRemind,
+}: {
+  onBackup: () => void
+  onRestore: () => void
+  onIcs: () => void
+  onRemind: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  return (
+    <div className="menu-wrap" ref={ref}>
+      <button
+        type="button"
+        className="ghost-btn compact"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        数据 ▾
+      </button>
+      {open && (
+        <div className="menu-panel" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onBackup()
+              setOpen(false)
+            }}
+          >
+            导出备份
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onRestore()
+              setOpen(false)
+            }}
+          >
+            恢复备份
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onIcs()
+              setOpen(false)
+            }}
+          >
+            导出 ICS
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onRemind()
+              setOpen(false)
+            }}
+          >
+            提醒权限
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -216,8 +246,8 @@ function SearchJump({
     setQuery('')
   }
 
-  function runSearch(nextQuery = query) {
-    const q = nextQuery.trim()
+  function runSearch() {
+    const q = query.trim()
     if (!q) {
       setOpen(false)
       setMessage('')
@@ -254,7 +284,7 @@ function SearchJump({
       <input
         id="lumina-search"
         type="search"
-        placeholder="输入关键词，回车跳转…"
+        placeholder="搜索…"
         value={query}
         autoComplete="off"
         onChange={(e) => {
