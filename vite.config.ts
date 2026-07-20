@@ -15,7 +15,7 @@ export default defineConfig({
         short_name: 'Lumina',
         description: '个人日程与待办工作台',
         theme_color: '#1a5f5a',
-        background_color: '#e8f0f4',
+        background_color: '#d8f5e8',
         display: 'standalone',
         lang: 'zh-CN',
         start_url: '/test/',

@@ -98,11 +98,13 @@ export function EditorPanel() {
 
   return (
     <>
-      <button
-        type="button"
+      <div
         className="editor-backdrop"
-        aria-label="关闭编辑"
+        role="presentation"
         onClick={closeEditor}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') closeEditor()
+        }}
       />
       <aside className="editor-panel" role="dialog" aria-modal="true">
         <h2>{isNew ? (isEvent ? '新事件' : '新待办') : isEvent ? '编辑事件' : '编辑待办'}</h2>
@@ -119,7 +121,7 @@ export function EditorPanel() {
         </div>
 
         {isEvent ? (
-          <div className="row-2">
+          <div className="datetime-stack">
             <div className="field">
               <label htmlFor="start">开始</label>
               <input
@@ -152,18 +154,26 @@ export function EditorPanel() {
         )}
 
         <div className="field">
-          <label htmlFor="color">颜色</label>
-          <select
-            id="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value as ItemColor)}
-          >
+          <span className="field-label" id="color-label">
+            颜色
+          </span>
+          <div className="color-swatches" role="radiogroup" aria-labelledby="color-label">
             {COLORS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
+              <button
+                key={c.value}
+                type="button"
+                role="radio"
+                aria-checked={color === c.value}
+                aria-label={c.label}
+                title={c.label}
+                className={`color-swatch color-${c.value} ${color === c.value ? 'selected' : ''}`}
+                onClick={() => setColor(c.value)}
+              >
+                <span className="swatch-dot" />
+                <span className="swatch-name">{c.label}</span>
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         <div className="field">
