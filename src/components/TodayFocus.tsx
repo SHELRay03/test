@@ -27,7 +27,10 @@ export function TodayFocus({ day }: { day: Date }) {
 
     const openTodos = todos
       .filter((t) => todoOnDay(t.dueDate, day) && !t.completed)
-      .sort((a, b) => a.title.localeCompare(b.title, 'zh'))
+      .sort(
+        (a, b) =>
+          (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title, 'zh'),
+      )
 
     if (nextEvent) {
       return {

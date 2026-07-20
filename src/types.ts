@@ -51,6 +51,8 @@ export interface TodoItem {
   completed: boolean
   color: ItemColor
   note: string
+  /** 越小越靠前（优先级越高） */
+  order: number
   createdAt: string
   updatedAt: string
 }

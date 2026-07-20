@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { db, normalizeEvent } from './db'
+import { db, normalizeEvent, normalizeTodo } from './db'
 import type {
   CalendarEvent,
   DisplayFilters,
@@ -36,6 +36,7 @@ interface AppState {
   deleteTodo: (id: string) => Promise<void>
   toggleTodo: (id: string) => Promise<void>
   toggleEventCompleted: (id: string) => Promise<void>
+  reorderTodos: (orderedIds: string[]) => Promise<void>
   requestMoveEvent: (
     eventId: string,
     occurrenceDay: Date,
@@ -49,11 +50,14 @@ interface AppState {
 }
 
 async function loadAll() {
-  const [rawEvents, todos] = await Promise.all([
+  const [rawEvents, rawTodos] = await Promise.all([
     db.events.toArray(),
     db.todos.toArray(),
   ])
-  return { events: rawEvents.map(normalizeEvent), todos }
+  return {
+    events: rawEvents.map(normalizeEvent),
+    todos: rawTodos.map(normalizeTodo),
+  }
 }
 
 async function refresh(set: (partial: Partial<AppState>) => void) {
@@ -132,6 +136,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const existing = input.id
       ? get().todos.find((t) => t.id === input.id)
       : undefined
+    const maxOrder = get().todos.reduce((m, t) => Math.max(m, t.order ?? 0), -1)
     const todo: TodoItem = {
       id,
       title: input.title.trim() || '未命名待办',
@@ -142,6 +147,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       completed: input.completed ?? existing?.completed ?? false,
       color: (input.color ?? existing?.color ?? 'amber') as ItemColor,
       note: input.note ?? existing?.note ?? '',
+      order:
+        input.order ??
+        existing?.order ??
+        maxOrder + 1,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     }
@@ -166,6 +175,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     const event = get().events.find((e) => e.id === id)
     if (!event) return
     await get().upsertEvent({ ...event, completed: !event.completed })
+  },
+
+  reorderTodos: async (orderedIds) => {
+    const now = nowISO()
+    const byId = new Map(get().todos.map((t) => [t.id, t]))
+    const updates: TodoItem[] = []
+    orderedIds.forEach((id, index) => {
+      const todo = byId.get(id)
+      if (!todo) return
+      if (todo.order === index) return
+      updates.push({ ...todo, order: index, updatedAt: now })
+    })
+    if (updates.length === 0) return
+    await db.todos.bulkPut(updates)
+    await refresh(set)
   },
 
   requestMoveEvent: async (eventId, occurrenceDay, start, end) => {
@@ -237,7 +261,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       await db.events.clear()
       await db.todos.clear()
       if (backup.events.length) await db.events.bulkPut(backup.events.map(normalizeEvent))
-      if (backup.todos.length) await db.todos.bulkPut(backup.todos)
+      if (backup.todos.length)
+        await db.todos.bulkPut(backup.todos.map(normalizeTodo))
     })
     await refresh(set)
   },
@@ -300,6 +325,7 @@ async function seedDemo() {
       completed: false,
       color: 'amber',
       note: '',
+      order: 0,
       createdAt: now,
       updatedAt: now,
     },
@@ -310,6 +336,7 @@ async function seedDemo() {
       completed: false,
       color: 'rose',
       note: '',
+      order: 1,
       createdAt: now,
       updatedAt: now,
     },

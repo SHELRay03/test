@@ -44,6 +44,24 @@ class LuminaDB extends Dexie {
             if (event.allDay === undefined) event.allDay = false
           })
       })
+    this.version(4)
+      .stores({
+        events: 'id, start, end, completed',
+        todos: 'id, dueDate, completed, order',
+      })
+      .upgrade(async (tx) => {
+        const table = tx.table('todos')
+        const all = await table.toArray()
+        all.sort(
+          (a, b) =>
+            String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')),
+        )
+        await Promise.all(
+          all.map((todo, index) =>
+            table.update(todo.id, { order: todo.order ?? index }),
+          ),
+        )
+      })
   }
 }
 
@@ -59,5 +77,12 @@ export function normalizeEvent(raw: CalendarEvent): CalendarEvent {
       exdates: raw.recurrence?.exdates ?? [],
     },
     remindMinutes: raw.remindMinutes ?? null,
+  }
+}
+
+export function normalizeTodo(raw: TodoItem): TodoItem {
+  return {
+    ...raw,
+    order: typeof raw.order === 'number' ? raw.order : Date.parse(raw.createdAt) || 0,
   }
 }

@@ -113,7 +113,13 @@ export function WeekView() {
           </div>
           {days.map((day) => {
             const dayTodos = filters.showTodos
-              ? todos.filter((t) => todoOnDay(t.dueDate, day))
+              ? todos
+                  .filter((t) => todoOnDay(t.dueDate, day))
+                  .sort(
+                    (a, b) =>
+                      (a.order ?? 0) - (b.order ?? 0) ||
+                      Number(a.completed) - Number(b.completed),
+                  )
               : []
             return (
               <div key={`todos-${day.toISOString()}`} className="week-todo-cell">
