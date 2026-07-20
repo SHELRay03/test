@@ -1,5 +1,5 @@
 import { isSameDay } from 'date-fns'
-import { useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useAppStore } from '../store'
 import {
   HOUR_END,
@@ -12,7 +12,9 @@ import {
   occurrenceOverlapsDay,
   todoOnDay,
 } from '../utils/date'
+import { layoutOverlaps } from '../utils/layout'
 import { DraggableEvent } from './DraggableEvent'
+import { EmptyState } from './EmptyState'
 
 const WEEK_HOURS = HOUR_END - HOUR_START
 const WEEK_BODY_HEIGHT = WEEK_HOURS * 60 * WEEK_PX
@@ -25,7 +27,7 @@ export function WeekView() {
   const openEditor = useAppStore((s) => s.openEditor)
   const setAnchorDate = useAppStore((s) => s.setAnchorDate)
   const setViewMode = useAppStore((s) => s.setViewMode)
-  const moveEventTimes = useAppStore((s) => s.moveEventTimes)
+  const requestMoveEvent = useAppStore((s) => s.requestMoveEvent)
 
   const days = useMemo(() => getWeekDays(anchorDate), [anchorDate])
   const hours = useMemo(
@@ -33,11 +35,34 @@ export function WeekView() {
     [],
   )
   const today = new Date()
+  const colRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const weekOccurrences = useMemo(() => {
     if (!filters.showEvents) return []
     return eventsForWeek(events, days)
   }, [events, days, filters.showEvents])
+
+  const resolveDayFromX = useCallback(
+    (clientX: number) => {
+      for (let i = 0; i < days.length; i++) {
+        const el = colRefs.current[i]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (clientX >= rect.left && clientX <= rect.right) return days[i]
+      }
+      return null
+    },
+    [days],
+  )
+
+  const isEmpty = events.length === 0 && todos.length === 0
+  if (isEmpty) {
+    return (
+      <div className="panel-inner">
+        <EmptyState />
+      </div>
+    )
+  }
 
   return (
     <div className="panel-inner">
@@ -58,6 +83,30 @@ export function WeekView() {
               <span className="n">{formatMonthDay(day)}</span>
             </button>
           ))}
+
+          {/* 全天带 */}
+          <div className="week-todo-gutter">
+            <span>全天</span>
+          </div>
+          {days.map((day) => {
+            const allDay = weekOccurrences.filter(
+              (o) => o.event.allDay && occurrenceOverlapsDay(o.start, o.end, day),
+            )
+            return (
+              <div key={`allday-${day.toISOString()}`} className="week-todo-cell">
+                {allDay.map((occ) => (
+                  <button
+                    key={occ.occurrenceId}
+                    type="button"
+                    className={`week-todo-chip color-${occ.event.color} ${occ.event.completed ? 'done' : ''}`}
+                    onClick={() => openEditor({ kind: 'event', id: occ.event.id })}
+                  >
+                    {occ.event.title}
+                  </button>
+                ))}
+              </div>
+            )
+          })}
 
           <div className="week-todo-gutter">
             {filters.showTodos ? <span>待办</span> : null}
@@ -90,29 +139,40 @@ export function WeekView() {
             ))}
           </div>
 
-          {days.map((day) => {
-            const dayEvents = weekOccurrences.filter((o) =>
-              occurrenceOverlapsDay(o.start, o.end, day),
+          {days.map((day, dayIndex) => {
+            const dayEvents = layoutOverlaps(
+              weekOccurrences.filter(
+                (o) => !o.event.allDay && occurrenceOverlapsDay(o.start, o.end, day),
+              ),
             )
             return (
               <div
                 key={`col-${day.toISOString()}`}
                 className="week-day-col"
                 style={{ height: WEEK_BODY_HEIGHT }}
+                ref={(el) => {
+                  colRefs.current[dayIndex] = el
+                }}
               >
-                {dayEvents.map((occ) => (
-                  <DraggableEvent
-                    key={occ.occurrenceId}
-                    occurrence={occ}
-                    day={day}
-                    pxPerMinute={WEEK_PX}
-                    className="week-event-drag"
-                    onOpen={() => openEditor({ kind: 'event', id: occ.event.id })}
-                    onCommit={({ start, end }) => {
-                      void moveEventTimes(occ.event.id, start, end)
-                    }}
-                  />
-                ))}
+                {dayEvents.map((occ) => {
+                  const width = `calc((100% - 0.3rem) / ${occ.colCount})`
+                  const left = `calc(0.15rem + ((100% - 0.3rem) / ${occ.colCount}) * ${occ.col})`
+                  return (
+                    <DraggableEvent
+                      key={occ.occurrenceId}
+                      occurrence={occ}
+                      day={day}
+                      pxPerMinute={WEEK_PX}
+                      className="week-event-drag"
+                      styleExtra={{ left, width, right: 'auto' }}
+                      resolveDayFromX={resolveDayFromX}
+                      onOpen={() => openEditor({ kind: 'event', id: occ.event.id })}
+                      onCommit={({ start, end }) => {
+                        void requestMoveEvent(occ.event.id, day, start, end)
+                      }}
+                    />
+                  )
+                })}
               </div>
             )
           })}

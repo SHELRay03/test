@@ -105,6 +105,7 @@ export function normalizeRecurrence(
     freq: rule?.freq ?? DEFAULT_RECURRENCE.freq,
     interval: Math.max(1, rule?.interval ?? 1),
     until: rule?.until ?? null,
+    exdates: rule?.exdates ?? [],
   }
 }
 
@@ -166,12 +167,18 @@ export function expandEventsInRange(
         new Date(occurrenceStartOnDay(templateStart, cursor).getTime() + dur),
         rangeFrom,
       )) {
+        const dayKey = toDateKey(cursor)
+        if (rule.exdates.includes(dayKey)) {
+          cursor = addDays(cursor, step)
+          guard++
+          continue
+        }
         const occStart = occurrenceStartOnDay(templateStart, cursor)
         const occEnd = new Date(occStart.getTime() + dur)
         if (occStart <= rangeTo && occEnd >= rangeFrom) {
           out.push({
             event,
-            occurrenceId: `${event.id}::${toDateKey(cursor)}`,
+            occurrenceId: `${event.id}::${dayKey}`,
             start: occStart,
             end: occEnd,
             isOccurrence: !isSameDay(cursor, templateDay),

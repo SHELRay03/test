@@ -5,11 +5,14 @@ import type {
   DisplayFilters,
   EditorTarget,
   ItemColor,
+  PendingMove,
   RecurrenceRule,
+  RecurrenceScope,
   TodoItem,
   ViewMode,
 } from './types'
 import { DEFAULT_RECURRENCE } from './types'
+import type { LuminaBackup } from './utils/backup'
 import { defaultEventRange, nowISO, toDateKey, uid } from './utils/date'
 
 interface AppState {
@@ -20,6 +23,7 @@ interface AppState {
   events: CalendarEvent[]
   todos: TodoItem[]
   editor: EditorTarget
+  pendingMove: PendingMove | null
   hydrate: () => Promise<void>
   setViewMode: (mode: ViewMode) => void
   setAnchorDate: (date: Date) => void
@@ -32,11 +36,16 @@ interface AppState {
   deleteTodo: (id: string) => Promise<void>
   toggleTodo: (id: string) => Promise<void>
   toggleEventCompleted: (id: string) => Promise<void>
-  moveEventTimes: (
-    id: string,
+  requestMoveEvent: (
+    eventId: string,
+    occurrenceDay: Date,
     start: Date,
     end: Date,
   ) => Promise<void>
+  resolvePendingMove: (scope: RecurrenceScope) => Promise<void>
+  cancelPendingMove: () => void
+  replaceAllData: (backup: LuminaBackup) => Promise<void>
+  loadDemoData: () => Promise<void>
 }
 
 async function loadAll() {
@@ -47,6 +56,11 @@ async function loadAll() {
   return { events: rawEvents.map(normalizeEvent), todos }
 }
 
+async function refresh(set: (partial: Partial<AppState>) => void) {
+  const data = await loadAll()
+  set(data)
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   viewMode: 'day',
@@ -55,15 +69,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   events: [],
   todos: [],
   editor: null,
+  pendingMove: null,
 
   hydrate: async () => {
     const data = await loadAll()
-    if (data.events.length === 0 && data.todos.length === 0) {
-      await seedDemo()
-      const seeded = await loadAll()
-      set({ ...seeded, ready: true })
-      return
-    }
     set({ ...data, ready: true })
   },
 
@@ -81,8 +90,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       ? get().events.find((e) => e.id === input.id)
       : undefined
     const range = defaultEventRange(get().anchorDate)
-    const recurrence: RecurrenceRule =
-      input.recurrence ?? existing?.recurrence ?? { ...DEFAULT_RECURRENCE }
+    const recurrence: RecurrenceRule = {
+      ...DEFAULT_RECURRENCE,
+      ...(input.recurrence ?? existing?.recurrence ?? DEFAULT_RECURRENCE),
+      exdates:
+        input.recurrence?.exdates ??
+        existing?.recurrence?.exdates ??
+        [],
+    }
     const event: CalendarEvent = {
       id,
       title: input.title.trim() || '未命名事件',
@@ -101,15 +116,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       updatedAt: now,
     }
     await db.events.put(event)
-    const events = (await db.events.toArray()).map(normalizeEvent)
-    set({ events })
+    await refresh(set)
     return id
   },
 
   deleteEvent: async (id) => {
     await db.events.delete(id)
-    const events = (await db.events.toArray()).map(normalizeEvent)
-    set({ events, editor: null })
+    await refresh(set)
+    set({ editor: null })
   },
 
   upsertTodo: async (input) => {
@@ -132,15 +146,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       updatedAt: now,
     }
     await db.todos.put(todo)
-    const todos = await db.todos.toArray()
-    set({ todos })
+    await refresh(set)
     return id
   },
 
   deleteTodo: async (id) => {
     await db.todos.delete(id)
-    const todos = await db.todos.toArray()
-    set({ todos, editor: null })
+    await refresh(set)
+    set({ editor: null })
   },
 
   toggleTodo: async (id) => {
@@ -155,20 +168,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().upsertEvent({ ...event, completed: !event.completed })
   },
 
-  moveEventTimes: async (id, start, end) => {
-    const event = get().events.find((e) => e.id === id)
+  requestMoveEvent: async (eventId, occurrenceDay, start, end) => {
+    const event = get().events.find((e) => e.id === eventId)
     if (!event) return
-    // 重复事件：只改系列的时刻与时长，保留模板日期
     if (event.recurrence.freq !== 'none') {
-      const oldStart = new Date(event.start)
-      const nextStart = new Date(oldStart)
-      nextStart.setHours(start.getHours(), start.getMinutes(), 0, 0)
-      const duration = end.getTime() - start.getTime()
-      const nextEnd = new Date(nextStart.getTime() + duration)
-      await get().upsertEvent({
-        ...event,
-        start: nextStart.toISOString(),
-        end: nextEnd.toISOString(),
+      set({
+        pendingMove: {
+          eventId,
+          occurrenceDayKey: toDateKey(occurrenceDay),
+          start: start.toISOString(),
+          end: end.toISOString(),
+        },
       })
       return
     }
@@ -176,7 +186,65 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...event,
       start: start.toISOString(),
       end: end.toISOString(),
+      allDay: false,
     })
+  },
+
+  resolvePendingMove: async (scope) => {
+    const pending = get().pendingMove
+    if (!pending) return
+    const event = get().events.find((e) => e.id === pending.eventId)
+    set({ pendingMove: null })
+    if (!event) return
+
+    const start = new Date(pending.start)
+    const end = new Date(pending.end)
+
+    if (scope === 'all') {
+      // 改全部：以新开始日为模板日，保留重复规则
+      await get().upsertEvent({
+        ...event,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        allDay: false,
+      })
+      return
+    }
+
+    // 只改这一次：排除原日，并新建单次事件
+    const exdates = [...new Set([...(event.recurrence.exdates ?? []), pending.occurrenceDayKey])]
+    await get().upsertEvent({
+      ...event,
+      recurrence: { ...event.recurrence, exdates },
+    })
+    await get().upsertEvent({
+      title: event.title,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      allDay: false,
+      color: event.color,
+      note: event.note,
+      completed: event.completed,
+      recurrence: { ...DEFAULT_RECURRENCE },
+      remindMinutes: event.remindMinutes,
+    })
+  },
+
+  cancelPendingMove: () => set({ pendingMove: null }),
+
+  replaceAllData: async (backup) => {
+    await db.transaction('rw', db.events, db.todos, async () => {
+      await db.events.clear()
+      await db.todos.clear()
+      if (backup.events.length) await db.events.bulkPut(backup.events.map(normalizeEvent))
+      if (backup.todos.length) await db.todos.bulkPut(backup.todos)
+    })
+    await refresh(set)
+  },
+
+  loadDemoData: async () => {
+    await seedDemo()
+    await refresh(set)
   },
 }))
 
@@ -192,6 +260,8 @@ async function seedDemo() {
     return d.toISOString()
   }
   const now = nowISO()
+  const existing = await db.events.count()
+  if (existing > 0) return
   await db.events.bulkAdd([
     {
       id: uid(),
@@ -216,7 +286,7 @@ async function seedDemo() {
       color: 'sky',
       note: '',
       completed: false,
-      recurrence: { freq: 'weekly', interval: 1, until: null },
+      recurrence: { freq: 'weekly', interval: 1, until: null, exdates: [] },
       remindMinutes: null,
       createdAt: now,
       updatedAt: now,

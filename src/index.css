@@ -437,6 +437,10 @@ input:focus:not(:focus-visible) {
   filter: brightness(1.05);
 }
 
+.event-block.ghost-away {
+  opacity: 0.35;
+}
+
 .event-block:hover {
   filter: brightness(1.05);
 }
@@ -603,7 +607,6 @@ input:focus:not(:focus-visible) {
 .week-grid {
   display: grid;
   grid-template-columns: 4.2rem repeat(7, minmax(5.5rem, 1fr));
-  grid-template-rows: auto auto auto;
   gap: 0;
   min-width: 780px;
   align-items: stretch;
@@ -944,6 +947,141 @@ input:focus:not(:focus-visible) {
 .color-rose { --item-color: var(--color-rose); }
 .color-slate { --item-color: var(--color-slate); }
 
+.today-focus {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem 0.85rem;
+  align-items: baseline;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.9rem;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.today-focus:hover:not(.is-clear) {
+  background: rgba(255, 255, 255, 0.7);
+  transform: translateY(-1px);
+}
+
+.today-focus.is-clear {
+  cursor: default;
+  grid-template-columns: auto 1fr;
+}
+
+.today-focus-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.today-focus-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.today-focus-meta {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+
+.allday-row {
+  margin-bottom: 0.85rem;
+}
+
+.allday-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.allday-chip {
+  border: 0;
+  border-left: 3px solid var(--item-color, var(--color-teal));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--item-color, var(--color-teal)) 18%, white);
+  padding: 0.4rem 0.7rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.allday-chip.done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.empty-state {
+  padding: 2.5rem 1rem 3rem;
+  text-align: center;
+  animation: rise-in 0.45s ease both;
+}
+
+.empty-state-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 400;
+}
+
+.empty-state-desc {
+  margin: 0.7rem auto 1.4rem;
+  max-width: 28ch;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.scope-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(18, 40, 36, 0.28);
+  backdrop-filter: blur(4px);
+}
+
+.scope-dialog {
+  width: min(360px, 100%);
+  border-radius: 18px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  animation: rise-in 0.25s ease both;
+}
+
+.scope-dialog h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 400;
+}
+
+.scope-dialog p {
+  margin: 0.55rem 0 1rem;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     width: calc(100% - 1rem);
@@ -957,11 +1095,12 @@ input:focus:not(:focus-visible) {
   .fab-row {
     width: 100%;
     margin-left: 0;
+    flex-wrap: wrap;
   }
 
   .fab-row .primary-btn,
   .fab-row .ghost-btn {
-    flex: 1;
+    flex: 1 1 auto;
   }
 
   .panel-inner {
@@ -972,7 +1111,35 @@ input:focus:not(:focus-visible) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .editor-backdrop {
+    background: rgba(18, 40, 36, 0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
   .editor-panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: min(88vh, 100%);
     width: 100%;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
+    animation: sheet-up 0.28s ease both;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

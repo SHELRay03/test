@@ -7,6 +7,7 @@ import {
   dateFromDayAndMinutes,
   formatTime,
   snapMinutes,
+  startOfDay,
 } from '../utils/date'
 
 interface Props {
@@ -14,7 +15,10 @@ interface Props {
   day: Date
   pxPerMinute: number
   className?: string
-  onCommit: (next: { start: Date; end: Date }) => void
+  styleExtra?: React.CSSProperties
+  /** 周视图跨天：根据指针 X 解析目标日 */
+  resolveDayFromX?: (clientX: number) => Date | null
+  onCommit: (next: { start: Date; end: Date; day: Date }) => void
   onOpen: () => void
 }
 
@@ -23,14 +27,19 @@ export function DraggableEvent({
   day,
   pxPerMinute,
   className = '',
+  styleExtra,
+  resolveDayFromX,
   onCommit,
   onOpen,
 }: Props) {
-  const [live, setLive] = useState<{ start: Date; end: Date } | null>(null)
+  const [live, setLive] = useState<{ start: Date; end: Date; day: Date } | null>(
+    null,
+  )
   const modeRef = useRef<'move' | 'resize' | null>(null)
   const originY = useRef(0)
   const baseStartMin = useRef(0)
   const baseEndMin = useRef(0)
+  const baseDay = useRef(day)
   const moved = useRef(false)
   const liveRef = useRef(live)
   liveRef.current = live
@@ -57,8 +66,9 @@ export function DraggableEvent({
       occurrence.start.getHours() * 60 + occurrence.start.getMinutes()
     baseEndMin.current =
       occurrence.end.getHours() * 60 + occurrence.end.getMinutes()
+    baseDay.current = day
     moved.current = false
-    setLive({ start: occurrence.start, end: occurrence.end })
+    setLive({ start: occurrence.start, end: occurrence.end, day })
 
     const onMove = (ev: PointerEvent) => {
       if (!modeRef.current) return
@@ -68,19 +78,30 @@ export function DraggableEvent({
       const maxBound = HOUR_END * 60
       const duration = baseEndMin.current - baseStartMin.current
 
+      let targetDay = baseDay.current
+      if (modeRef.current === 'move' && resolveDayFromX) {
+        const resolved = resolveDayFromX(ev.clientX)
+        if (resolved) {
+          targetDay = startOfDay(resolved)
+          if (targetDay.getTime() !== baseDay.current.getTime()) moved.current = true
+        }
+      }
+
       if (modeRef.current === 'move') {
         let nextStart = snapMinutes(baseStartMin.current + delta)
         nextStart = clamp(nextStart, minBound, maxBound - Math.max(duration, 15))
         setLive({
-          start: dateFromDayAndMinutes(day, nextStart),
-          end: dateFromDayAndMinutes(day, nextStart + duration),
+          day: targetDay,
+          start: dateFromDayAndMinutes(targetDay, nextStart),
+          end: dateFromDayAndMinutes(targetDay, nextStart + duration),
         })
       } else {
         let nextEnd = snapMinutes(baseEndMin.current + delta)
         nextEnd = clamp(nextEnd, baseStartMin.current + 15, maxBound)
         setLive({
-          start: dateFromDayAndMinutes(day, baseStartMin.current),
-          end: dateFromDayAndMinutes(day, nextEnd),
+          day: baseDay.current,
+          start: dateFromDayAndMinutes(baseDay.current, baseStartMin.current),
+          end: dateFromDayAndMinutes(baseDay.current, nextEnd),
         })
       }
     }
@@ -106,11 +127,13 @@ export function DraggableEvent({
 
   const { event } = occurrence
   const repeating = event.recurrence.freq !== 'none'
+  const ghostAway =
+    live && live.day.getTime() !== day.getTime() ? 'ghost-away' : ''
 
   return (
     <div
-      className={`event-block color-${event.color} ${event.completed ? 'done' : ''} ${live ? 'dragging' : ''} ${className}`}
-      style={{ top, height }}
+      className={`event-block color-${event.color} ${event.completed ? 'done' : ''} ${live ? 'dragging' : ''} ${ghostAway} ${className}`}
+      style={{ top, height, ...styleExtra }}
       onPointerDown={(e) => begin(e, 'move')}
       role="button"
       tabIndex={0}

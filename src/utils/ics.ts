@@ -74,6 +74,14 @@ export function buildIcsCalendar(
     lines.push(`SUMMARY:${escapeText(event.title)}`)
     if (event.note) lines.push(`DESCRIPTION:${escapeText(event.note)}`)
     if (rrule) lines.push(`RRULE:${rrule}`)
+    const exdates = event.recurrence?.exdates ?? []
+    if (exdates.length) {
+      lines.push(
+        `EXDATE:${exdates
+          .map((d) => toIcsUtc(parseISO(`${d}T00:00:00`)))
+          .join(',')}`,
+      )
+    }
     if (event.remindMinutes != null) {
       lines.push('BEGIN:VALARM')
       lines.push('ACTION:DISPLAY')
