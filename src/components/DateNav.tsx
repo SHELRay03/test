@@ -11,8 +11,10 @@ import {
 } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ViewMode } from '../types'
 import { getWeekDays, toDateKey } from '../utils/date'
+import { useFixedPopover } from '../utils/useFixedPopover'
 
 interface Props {
   viewMode: ViewMode
@@ -32,7 +34,10 @@ export function DateNav({
   const [open, setOpen] = useState(false)
   const [cursor, setCursor] = useState(() => startOfMonth(anchorDate))
   const wrapRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
   const step = viewMode === 'day' ? 1 : 7
+  const popoverStyle = useFixedPopover(open, triggerRef, 'start', 292)
 
   const label =
     viewMode === 'day'
@@ -48,7 +53,10 @@ export function DateNav({
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (wrapRef.current?.contains(target)) return
+      if (popoverRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
@@ -84,6 +92,7 @@ export function DateNav({
         ‹
       </button>
       <button
+        ref={triggerRef}
         type="button"
         className={`date-trigger ${open ? 'open' : ''}`}
         aria-haspopup="dialog"
@@ -108,71 +117,79 @@ export function DateNav({
         今天
       </button>
 
-      {open && (
-        <div className="date-popover" role="dialog" aria-label="选择日期">
-          <div className="date-popover-head">
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="上个月"
-              onClick={() => setCursor((c) => addMonths(c, -1))}
-            >
-              ‹
-            </button>
-            <div className="date-popover-month">
-              {format(cursor, 'yyyy年M月', { locale: zhCN })}
+      {open &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            className="date-popover is-fixed"
+            role="dialog"
+            aria-label="选择日期"
+            style={popoverStyle}
+          >
+            <div className="date-popover-head">
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="上个月"
+                onClick={() => setCursor((c) => addMonths(c, -1))}
+              >
+                ‹
+              </button>
+              <div className="date-popover-month">
+                {format(cursor, 'yyyy年M月', { locale: zhCN })}
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="下个月"
+                onClick={() => setCursor((c) => addMonths(c, 1))}
+              >
+                ›
+              </button>
             </div>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="下个月"
-              onClick={() => setCursor((c) => addMonths(c, 1))}
-            >
-              ›
-            </button>
-          </div>
-          {viewMode === 'week' && (
-            <p className="date-popover-hint">点选一天，跳转到包含该日的那一周</p>
-          )}
-          <div className="date-weekdays" aria-hidden="true">
-            {['一', '二', '三', '四', '五', '六', '日'].map((d) => (
-              <span key={d}>{d}</span>
-            ))}
-          </div>
-          <div className="date-grid">
-            {weeks.map((week) => {
-              const weekActive =
-                viewMode === 'week' &&
-                week.some((d) => selectedWeekKeys.has(toDateKey(d)))
-              return (
-                <div
-                  key={toDateKey(week[0])}
-                  className={`date-week-row ${weekActive ? 'week-active' : ''}`}
-                >
-                  {week.map((day) => {
-                    const inMonth = isSameMonth(day, cursor)
-                    const selected =
-                      viewMode === 'day'
-                        ? isSameDay(day, anchorDate)
-                        : selectedWeekKeys.has(toDateKey(day))
-                    const isToday = isSameDay(day, new Date())
-                    return (
-                      <button
-                        key={toDateKey(day)}
-                        type="button"
-                        className={`date-cell ${inMonth ? '' : 'muted'} ${selected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
-                        onClick={() => pick(day)}
-                      >
-                        {format(day, 'd')}
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+            {viewMode === 'week' && (
+              <p className="date-popover-hint">点选一天，跳转到包含该日的那一周</p>
+            )}
+            <div className="date-weekdays" aria-hidden="true">
+              {['一', '二', '三', '四', '五', '六', '日'].map((d) => (
+                <span key={d}>{d}</span>
+              ))}
+            </div>
+            <div className="date-grid">
+              {weeks.map((week) => {
+                const weekActive =
+                  viewMode === 'week' &&
+                  week.some((d) => selectedWeekKeys.has(toDateKey(d)))
+                return (
+                  <div
+                    key={toDateKey(week[0])}
+                    className={`date-week-row ${weekActive ? 'week-active' : ''}`}
+                  >
+                    {week.map((day) => {
+                      const inMonth = isSameMonth(day, cursor)
+                      const selected =
+                        viewMode === 'day'
+                          ? isSameDay(day, anchorDate)
+                          : selectedWeekKeys.has(toDateKey(day))
+                      const isToday = isSameDay(day, new Date())
+                      return (
+                        <button
+                          key={toDateKey(day)}
+                          type="button"
+                          className={`date-cell ${inMonth ? '' : 'muted'} ${selected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                          onClick={() => pick(day)}
+                        >
+                          {format(day, 'd')}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
