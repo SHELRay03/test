@@ -17,7 +17,6 @@ interface AppState {
   viewMode: ViewMode
   anchorDate: Date
   filters: DisplayFilters
-  searchQuery: string
   events: CalendarEvent[]
   todos: TodoItem[]
   editor: EditorTarget
@@ -25,7 +24,6 @@ interface AppState {
   setViewMode: (mode: ViewMode) => void
   setAnchorDate: (date: Date) => void
   setFilters: (partial: Partial<DisplayFilters>) => void
-  setSearchQuery: (q: string) => void
   openEditor: (target: NonNullable<EditorTarget>) => void
   closeEditor: () => void
   upsertEvent: (input: Partial<CalendarEvent> & { title: string }) => Promise<string>
@@ -54,7 +52,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   viewMode: 'day',
   anchorDate: startOfLocalDay(new Date()),
   filters: { showEvents: true, showTodos: true },
-  searchQuery: '',
   events: [],
   todos: [],
   editor: null,
@@ -74,7 +71,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAnchorDate: (date) => set({ anchorDate: startOfLocalDay(date) }),
   setFilters: (partial) =>
     set((s) => ({ filters: { ...s.filters, ...partial } })),
-  setSearchQuery: (q) => set({ searchQuery: q }),
   openEditor: (target) => set({ editor: target }),
   closeEditor: () => set({ editor: null }),
 

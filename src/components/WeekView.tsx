@@ -22,7 +22,6 @@ export function WeekView() {
   const events = useAppStore((s) => s.events)
   const todos = useAppStore((s) => s.todos)
   const filters = useAppStore((s) => s.filters)
-  const searchQuery = useAppStore((s) => s.searchQuery)
   const openEditor = useAppStore((s) => s.openEditor)
   const setAnchorDate = useAppStore((s) => s.setAnchorDate)
   const setViewMode = useAppStore((s) => s.setViewMode)
@@ -34,14 +33,11 @@ export function WeekView() {
     [],
   )
   const today = new Date()
-  const q = searchQuery.trim().toLowerCase()
 
   const weekOccurrences = useMemo(() => {
     if (!filters.showEvents) return []
-    return eventsForWeek(events, days).filter(
-      (o) => !q || o.event.title.toLowerCase().includes(q),
-    )
-  }, [events, days, filters.showEvents, q])
+    return eventsForWeek(events, days)
+  }, [events, days, filters.showEvents])
 
   return (
     <div className="panel-inner">
@@ -68,11 +64,7 @@ export function WeekView() {
           </div>
           {days.map((day) => {
             const dayTodos = filters.showTodos
-              ? todos.filter(
-                  (t) =>
-                    todoOnDay(t.dueDate, day) &&
-                    (!q || t.title.toLowerCase().includes(q)),
-                )
+              ? todos.filter((t) => todoOnDay(t.dueDate, day))
               : []
             return (
               <div key={`todos-${day.toISOString()}`} className="week-todo-cell">
